@@ -1,0 +1,45 @@
+﻿{
+  "theme": {
+    "appName": "Revision Hub",
+    "tagline": "Explore core engineering concepts in one place."
+  },
+  "tiles": [
+    {
+      "key": "profile",
+      "icon": "👤",
+      "title": "Profile",
+      "description": "Build a strong engineering identity and career narrative."
+    },
+    {
+      "key": "devops",
+      "icon": "⚙️",
+      "title": "DevOps",
+      "description": "Understand delivery pipelines, automation, and reliability."
+    },
+    {
+      "key": "lld",
+      "icon": "🧠",
+      "title": "LLD",
+      "description": "Design scalable systems and object-oriented solutions."
+    },
+    {
+      "key": "hld",
+      "icon": "🏗️",
+      "title": "HLD",
+      "description": "Shape architecture, boundaries, and platform choices."
+    }
+  ],
+  "pages": {
+    "profile": {
+      "badge": "Profile",
+      "title": "Profile",
+      "intro": "A strong profile highlights your strengths, focus areas, and growth story.",
+      "points": [
+        "Show your technical strengths clearly.",
+        "Highlight your collaboration and communication skills.",
+        "Keep your story focused on impact."
+      ],
+      "tags": ["Career", "Growth", "Communication"]
+    }
+  }
+}
