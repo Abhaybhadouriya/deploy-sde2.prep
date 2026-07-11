@@ -5,7 +5,6 @@ import RevisionHeroSection from "../components/revision/RevisionHeroSection";
 import RevisionTopicCard from "../components/revision/RevisionTopicCard";
 import { db } from "../firebase";
 import { doc, setDoc, getDocs, collection, getDoc, arrayUnion } from "firebase/firestore";
-import hldData from "../data/hld.json";
 import "../components/revision.css";
 
 // Helper functions for date & status computation
@@ -63,9 +62,23 @@ function computeHealthCounts(revisionMap, allTopicIds) {
 
 export default function HldPage() {
   const { user } = useAuth();
-  const config = hldData;
+  const [config, setConfig] = useState(null);
 
-  const modules = useMemo(() => config.modules || [], [config.modules]);
+  useEffect(() => {
+    const fetchConfig = async () => {
+      try {
+        const snap = await getDoc(doc(db, "sdeprepJson", "hld"));
+        if (snap.exists()) {
+          setConfig(snap.data());
+        }
+      } catch (err) {
+        console.error("Error fetching HLD config:", err);
+      }
+    };
+    fetchConfig();
+  }, []);
+
+  const modules = useMemo(() => config?.modules || [], [config]);
   const topicIds = useMemo(
     () => modules.flatMap((module) => module.topics.map((topic) => topic.id)),
     [modules]
@@ -84,6 +97,7 @@ export default function HldPage() {
   );
 
   useEffect(() => {
+    if (!config) return; // Guard against null config
     let active = true;
     const fetchGlobalLinks = async () => {
       try {
@@ -97,10 +111,10 @@ export default function HldPage() {
     };
     fetchGlobalLinks();
     return () => { active = false; };
-  }, [config.revisionPrefix]);
+  }, [config?.revisionPrefix]);
 
   useEffect(() => {
-    if (!user?.uid) {
+    if (!user?.uid || !config) {
       setRevisionMap({});
       setBanner("Sign in with Google to sync and save your progress to the cloud.");
       return undefined;
@@ -134,7 +148,7 @@ export default function HldPage() {
     return () => {
       active = false;
     };
-  }, [config.revisionPrefix, user?.uid]);
+  }, [config?.revisionPrefix, user?.uid]);
 
   useEffect(() => {
     if (typeof window === "undefined" || modules.length === 0) return undefined;
@@ -210,6 +224,8 @@ export default function HldPage() {
       setBanner("Failed to submit link.");
     }
   };
+
+  if (!config) return <div className="revision-page" style={{padding: '2rem', color: 'white'}}>Loading content...</div>;
 
   return (
     <div className="revision-page">

@@ -1,4 +1,4 @@
-{
+{"data":{
   "revisionPrefix": "lld",
   "eyebrow": "Module 00 · Spaced revision",
   "title": "LLD — Revision Log",
@@ -846,4 +846,5 @@
       ]
     }
   ]
+}
 }
