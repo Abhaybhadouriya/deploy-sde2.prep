@@ -1,4 +1,4 @@
-﻿import { Link, Route, Routes, useParams, useNavigate } from "react-router-dom";
+﻿import { Link, Route, Routes, useParams, useNavigate, Navigate } from "react-router-dom";
 import { useEffect, useState } from "react";
 import { doc, getDoc, setDoc, collection, getDocs } from "firebase/firestore";
 import { db } from "./firebase";
@@ -29,7 +29,7 @@ function daysSince(dateStr) {
 }
 
 function App() {
-  const { user, logout, loginWithGoogle } = useAuth();
+  const { user, logout, signInWithGoogle } = useAuth(); // Corrected function name
   const navigate = useNavigate();
   const [content, setContent] = useState(contentData);
   const [loading, setLoading] = useState(true);
@@ -65,7 +65,7 @@ function App() {
   return (
     <div className="app-shell revision-page" style={{ minHeight: "100vh", display: "flex", flexDirection: "column", background: "var(--bg, #0B0F14)" }}>
       <header className="site" style={{ position: "sticky", top: 0, zIndex: 50, background: "rgba(11, 15, 20, 0.88)", backdropFilter: "blur(8px)", borderBottom: "1px solid var(--border, #1E2938)" }}>
-        <div className="site-nav" style={{ maxWidth: "1180px", margin: "0 auto", padding: "14px 24px", display: "flex", alignItems: "center", justifySpace: "between", justifyContent: "space-between" }}>
+        <div className="site-nav" style={{ maxWidth: "1180px", margin: "0 auto", padding: "14px 24px", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
           <Link to="/" className="brand" style={{ textDecoration: "none", color: "var(--text, #E7EDF3)", display: "flex", alignItems: "center", gap: "10px" }}>
             <span className="dot" style={{ width: "9px", height: "9px", borderRadius: "2px", background: "var(--accent, #49D3C4)", boxShadow: "0 0 10px var(--accent, #49D3C4)" }}></span>
             {content.theme?.appName || "sde2.prep"}
@@ -77,12 +77,12 @@ function App() {
                 <Link to="/profile" className="mono" style={{ textDecoration: "none", color: "var(--accent, #49D3C4)", fontSize: "13px" }}>
                   {user.displayName?.split(" ")[0] || "Profile"}
                 </Link>
-                <button onClick={handleLogout} className="btn-revise" style={{ background: "transparent", border: "1px solid var(--red, #E5484D)", color: "var(--red, #E5484D)", cursor: "pointer", fontSize: "11.5px", padding: "6px 12px" }}>
+                <button onClick={logout} className="btn-revise" style={{ background: "transparent", border: "1px solid var(--red, #E5484D)", color: "var(--red, #E5484D)", cursor: "pointer", fontSize: "11.5px", padding: "6px 12px" }}>
                   Logout
                 </button>
               </>
             ) : (
-              <button onClick={loginWithGoogle} className="btn-revise" style={{ fontSize: "11.5px", padding: "6px 12px" }}>
+              <button onClick={signInWithGoogle} className="btn-revise" style={{ fontSize: "11.5px", padding: "6px 12px" }}>
                 Sign In
               </button>
             )}
@@ -93,10 +93,10 @@ function App() {
       <main className="content" style={{ flex: "1" }}>
         <Routes>
           <Route path="/" element={<HomePage content={content} />} />
-          <Route path="/lld" element={<LldPage />} />
-          <Route path="/hld" element={<HldPage />} />
-          <Route path="/devops" element={<DevOpsPage />} />
-          <Route path="/profile" element={<ProfilePage />} />
+          <Route path="/lld" element={user ? <LldPage /> : <Navigate to="/" />} />
+          <Route path="/hld" element={user ? <HldPage /> : <Navigate to="/" />} />
+          <Route path="/devops" element={user ? <DevOpsPage /> : <Navigate to="/" />} />
+          <Route path="/profile" element={user ? <ProfilePage /> : <Navigate to="/" />} />
           <Route path="/:pageKey" element={<DetailPage content={content} />} />
         </Routes>
       </main>

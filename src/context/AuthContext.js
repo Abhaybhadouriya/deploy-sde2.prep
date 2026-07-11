@@ -1,6 +1,7 @@
 import { createContext, useContext, useEffect, useMemo, useState } from "react";
 import {
   onAuthStateChanged,
+  reload,
   signInWithPopup,
   signOut,
 } from "firebase/auth";
@@ -45,24 +46,30 @@ export function AuthProvider({ children }) {
 
   const signInWithGoogle = async () => {
     setAuthError("");
+    let reloadWindow = true; // Ensure the auth state is reloaded before signing in
     try {
       await signInWithPopup(auth, googleProvider);
     } catch (error) {
+      console.error("Sign-in error:", error);
+      if (error.code === 'auth/admin-restricted-operation') {
+        alert("Something went wrong signing with this ID. This account may have administrative restrictions.");
+      } else {
+        alert("Something went wrong during sign-in. Please try again.");
+      }
+      reloadWindow = false; // Prevent reload if there's an error
       setAuthError(error.message || "Google sign-in failed.");
-      throw error;
     }
-    window.location.reload();
+    if (reloadWindow) {
+      window.location.reload();
+    } // Refresh the page to update the state after sign-in
   };
 
   const logout = () => {
-
     signOut(auth).then(() => {
       setUser(null);
-    
     }).catch((error) => {
       setAuthError(error.message || "Logout failed.");
     });
-    window.location.reload();
   };
 
   const value = useMemo(
