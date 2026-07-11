@@ -64,6 +64,16 @@ export default function DevOpsPage() {
   const { user } = useAuth();
   const [config, setConfig] = useState(null);
 
+  // Management States
+  const [manageMode, setManageMode] = useState(null);
+  const [selMod, setSelMod] = useState("");
+  const [selTopic, setSelTopic] = useState("");
+  const [selSub, setSelSub] = useState("");
+
+  // Confirmation States
+  const [showConfirm, setShowConfirm] = useState(false);
+  const [deleteInput, setDeleteInput] = useState("");
+
   useEffect(() => {
     const fetchConfig = async () => {
       try {
@@ -243,22 +253,100 @@ export default function DevOpsPage() {
     }
   };
 
+  const updateFirebaseConfig = async (newConfig) => {
+    try {
+      await setDoc(doc(db, "sdeprepJson", "devops"), { data: newConfig });
+      setConfig(newConfig);
+      setBanner("Configuration updated successfully!");
+      setManageMode(null);
+      setSelMod(""); setSelTopic(""); setSelSub("");
+    } catch (err) {
+      console.error("Error updating config:", err);
+      setBanner("Failed to update configuration.");
+    }
+  };
+
+  const handleRemoveAction = async () => {
+    if (deleteInput !== "delete") {
+      alert("Please type 'delete' to confirm.");
+      return;
+    }
+    if (!config || !selMod) return;
+    let newModules = JSON.parse(JSON.stringify(config.modules));
+    const mIdx = newModules.findIndex(m => m.id === selMod);
+    if (mIdx === -1) return;
+
+    if (selSub) {
+      const tIdx = newModules[mIdx].topics.findIndex(t => t.id === selTopic);
+      newModules[mIdx].topics[tIdx].subs.splice(parseInt(selSub), 1);
+    } else if (selTopic) {
+      newModules[mIdx].topics = newModules[mIdx].topics.filter(t => t.id !== selTopic);
+    } else {
+      newModules.splice(mIdx, 1);
+    }
+
+    await updateFirebaseConfig({ ...config, modules: newModules });
+    setShowConfirm(false);
+    setDeleteInput("");
+  };
+
   if (!config) return <div className="revision-page" style={{padding: '2rem', color: 'white'}}>Loading content...</div>;
+
+  const currentModule = config.modules?.find(m => m.id === selMod);
+  const currentTopic = currentModule?.topics?.find(t => t.id === selTopic);
 
   return (
     <div className="revision-page">
-      <RevisionSiteHeader
-        activeKey={config.revisionPrefix}
-        navLabel={config.navLabel}
-      />
-
+      <RevisionSiteHeader activeKey={config.revisionPrefix} navLabel={config.navLabel} />
       <RevisionHeroSection config={config} healthCounts={healthCounts} />
 
-      {banner ? (
-        <div className="sync-banner show">
-          <span>{banner}</span>
+      {/* Management UI */}
+      <div className="container" style={{ marginBottom: '1rem', display: 'flex', gap: '10px' }}>
+        <button className="btn-revise" onClick={() => setManageMode(manageMode === 'add' ? null : 'add')}>Add Topic</button>
+        <button className="btn-revise" onClick={() => setManageMode(manageMode === 'edit' ? null : 'edit')}>Edit Topic</button>
+        <button className="btn-revise" style={{ borderColor: 'var(--red)' }} onClick={() => setManageMode(manageMode === 'remove' ? null : 'remove')}>Remove Topic</button>
+      </div>
+
+      {manageMode === 'remove' && (
+        <div className="container" style={{ background: 'var(--panel)', padding: '1.5rem', borderRadius: '8px', marginBottom: '2rem', border: '1px solid var(--border)' }}>
+          <h4 style={{ color: 'var(--text)', marginBottom: '1rem' }}>Cascading Remove</h4>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+            <select value={selMod} onChange={(e) => { setSelMod(e.target.value); setSelTopic(""); setSelSub(""); }} className="mono" style={{ background: '#0B0F14', color: 'white', padding: '8px' }}>
+              <option value="">Select Module...</option>
+              {config.modules.map(m => <option key={m.id} value={m.id}>{m.title}</option>)}
+            </select>
+            {selMod && (
+              <select value={selTopic} onChange={(e) => { setSelTopic(e.target.value); setSelSub(""); }} className="mono" style={{ background: '#0B0F14', color: 'white', padding: '8px' }}>
+                <option value="">Select Topic...</option>
+                {currentModule?.topics.map(t => <option key={t.id} value={t.id}>{t.title}</option>)}
+              </select>
+            )}
+            {selTopic && (
+              <select value={selSub} onChange={(e) => setSelSub(e.target.value)} className="mono" style={{ background: '#0B0F14', color: 'white', padding: '8px' }}>
+                <option value="">Select Subtopic...</option>
+                {currentTopic?.subs.map((s, idx) => <option key={idx} value={idx}>{s.t}</option>)}
+              </select>
+            )}
+            <button className="btn-revise" style={{ background: 'var(--red)', opacity: selMod ? 1 : 0.5 }} disabled={!selMod} onClick={() => setShowConfirm(true)}>
+              Remove Selected {selSub ? "Subtopic" : selTopic ? "Topic" : "Module"}
+            </button>
+          </div>
         </div>
-      ) : null}
+      )}
+
+      {showConfirm && (
+        <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.85)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000, padding: '20px' }}>
+          <div style={{ background: 'var(--panel)', padding: '2rem', borderRadius: '12px', border: '1px solid var(--border)', maxWidth: '400px', width: '100%', textAlign: 'center' }}>
+            <h3 style={{ color: 'var(--text)', marginBottom: '1rem' }}>Confirm Deletion</h3>
+            <p style={{ color: 'var(--text-dim)', fontSize: '14px', marginBottom: '1.5rem' }}>Type <span style={{ color: 'var(--red)', fontWeight: 'bold' }}>delete</span> to confirm.</p>
+            <input type="text" value={deleteInput} onChange={(e) => setDeleteInput(e.target.value)} placeholder="type delete here" style={{ width: '100%', background: '#0B0F14', border: '1px solid var(--border)', color: 'white', padding: '10px', borderRadius: '4px', marginBottom: '1.5rem', textAlign: 'center' }} />
+            <div style={{ display: 'flex', gap: '10px' }}>
+              <button className="btn-revise" style={{ flex: 1 }} onClick={() => { setShowConfirm(false); setDeleteInput(""); }}>Cancel</button>
+              <button className="btn-revise" style={{ flex: 1, background: 'var(--red)', borderColor: 'var(--red)' }} onClick={handleRemoveAction}>Confirm Delete</button>
+            </div>
+          </div>
+        </div>
+      )}
 
       <div className="layout">
         <nav className="toc">

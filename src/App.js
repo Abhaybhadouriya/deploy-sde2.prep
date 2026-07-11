@@ -7,9 +7,6 @@ import contentData from "./data/content.json";
 import LldPage from "./pages/LldPage";
 import HldPage from "./pages/HldPage";
 import DevOpsPage from "./pages/DevOpsPage";
-import lldData from "./data/lld.json";
-import hldData from "./data/hld.json";
-import devopsData from "./data/devops.json";
 import "./components/revision.css";
 
 // Re-using the same spacing logic across the application
@@ -117,29 +114,39 @@ function ProfilePage() {
     
     const fetchAllStats = async () => {
       const results = {};
-      const datasets = { hld: hldData, lld: lldData, devops: devopsData };
+      const keys = ["hld", "lld", "devops"];
 
-      for (const [key, config] of Object.entries(datasets)) {
-        const snap = await getDocs(collection(db, "sdeprep", user.uid, key));
-        const revisionMap = {};
-        snap.forEach((docSnap) => {
-          revisionMap[docSnap.id] = docSnap.data();
-        });
+      for (const key of keys) {
+        try {
+          // Fetch Topic Configuration from Firebase
+          const configSnap = await getDoc(doc(db, "sdeprepJson", key));
+          if (!configSnap.exists()) continue;
+          const config = configSnap.data();
 
-        const topicIds = config.modules.flatMap((m) => m.topics.map((t) => t.id));
-        let fresh = 0, freshIsh = 0, dueSoon = 0, overdue = 0;
+          // Fetch User Revision Progress
+          const snap = await getDocs(collection(db, "sdeprep", user.uid, config.revisionPrefix));
+          const revisionMap = {};
+          snap.forEach((docSnap) => {
+            revisionMap[docSnap.id] = docSnap.data();
+          });
 
-        topicIds.forEach((id) => {
-          const lastRevised = revisionMap[id]?.lastRevised;
-          const days = daysSince(lastRevised);
+          const topicIds = config.modules.flatMap((m) => m.topics.map((t) => t.id));
+          let fresh = 0, freshIsh = 0, dueSoon = 0, overdue = 0;
 
-          if (days <= 7) fresh++;
-          else if (days <= 14) freshIsh++;
-          else if (days <= 29) dueSoon++;
-          else overdue++;
-        });
+          topicIds.forEach((id) => {
+            const lastRevised = revisionMap[id]?.lastRevised;
+            const days = daysSince(lastRevised);
 
-        results[key] = { fresh, freshIsh, dueSoon, overdue, total: topicIds.length, revisedCount: snap.size };
+            if (days <= 7) fresh++;
+            else if (days <= 14) freshIsh++;
+            else if (days <= 29) dueSoon++;
+            else overdue++;
+          });
+
+          results[key] = { fresh, freshIsh, dueSoon, overdue, total: topicIds.length, revisedCount: snap.size };
+        } catch (err) {
+          console.error(`Error fetching stats for ${key}:`, err);
+        }
       }
       setStats(results);
     };
