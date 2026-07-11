@@ -88,7 +88,7 @@ export default function DevOpsPage() {
       try {
         const snap = await getDoc(doc(db, "sdeprepJson", "devops"));
         if (snap.exists()) {
-          setConfig(snap.data().data);
+          setConfig(snap.data());
         }
       } catch (err) {
         console.error("Error fetching DevOps config:", err);
@@ -370,7 +370,6 @@ export default function DevOpsPage() {
       {/* Management UI */}
       <div className="container" style={{ marginBottom: '1rem', display: 'flex', gap: '10px' }}>
         <button className="btn-revise" onClick={() => setManageMode(manageMode === 'add' ? null : 'add')}>Add Topic</button>
-        <button className="btn-revise" onClick={() => setManageMode(manageMode === 'edit' ? null : 'edit')}>Edit Topic</button>
         <button className="btn-revise" style={{ borderColor: 'var(--red)' }} onClick={() => setManageMode(manageMode === 'remove' ? null : 'remove')}>Remove Topic</button>
       </div>
 
