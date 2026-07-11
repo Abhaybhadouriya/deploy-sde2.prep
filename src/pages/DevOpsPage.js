@@ -70,6 +70,15 @@ export default function DevOpsPage() {
   const [selTopic, setSelTopic] = useState("");
   const [selSub, setSelSub] = useState("");
 
+  // New Add States
+  const [formData, setFormData] = useState({
+    moduleTitle: "",
+    topicTitle: "",
+    subTitle: "",
+    subDesc: "",
+    subRef: ""
+  });
+
   // Confirmation States
   const [showConfirm, setShowConfirm] = useState(false);
   const [deleteInput, setDeleteInput] = useState("");
@@ -79,7 +88,7 @@ export default function DevOpsPage() {
       try {
         const snap = await getDoc(doc(db, "sdeprepJson", "devops"));
         if (snap.exists()) {
-          setConfig(snap.data());
+          setConfig(snap.data().data);
         }
       } catch (err) {
         console.error("Error fetching DevOps config:", err);
@@ -260,10 +269,68 @@ export default function DevOpsPage() {
       setBanner("Configuration updated successfully!");
       setManageMode(null);
       setSelMod(""); setSelTopic(""); setSelSub("");
+      setFormData({ topicTitle: "", subTitle: "", subDesc: "", subRef: "" });
     } catch (err) {
       console.error("Error updating config:", err);
       setBanner("Failed to update configuration.");
     }
+  };
+
+  const handleAddAction = async (e) => {
+    e.preventDefault();
+    if (!config) return;
+
+    let newModules = JSON.parse(JSON.stringify(config.modules));
+    
+    // 1. Calculate next IDs (ssmm format: seconds + minutes)
+    const now = new Date();
+    const ss = String(now.getSeconds()).padStart(2, '0');
+    const mm = String(now.getMinutes()).padStart(2, '0');
+    const ssmm = `${ss}${mm}`;
+    const nextTopicId = ssmm;
+
+    const newSubItem = {
+      t: formData.subTitle,
+      d: formData.subDesc,
+      ref: formData.subRef
+    };
+
+    if (selMod === "NEW") {
+      // 2. Create brand new Module with ssmm format
+      const nextModNum = Number(newModules[newModules.length - 1]?.idx ?? 0) + 1;
+      const newModule = {
+        id: `m${ssmm}`,
+        idx: String(nextModNum).padStart(2, '0'),
+        title: formData.moduleTitle,
+        topics: [{
+          id: nextTopicId,
+          title: formData.topicTitle,
+          subs: [newSubItem]
+        }]
+      };
+      newModules.push(newModule);
+    } else {
+      const mIdx = newModules.findIndex(m => m.id === selMod);
+      if (mIdx === -1) return;
+
+      if (selTopic === "NEW") {
+        // 3. Create new Topic in existing Module
+        newModules[mIdx].topics.push({
+          id: nextTopicId,
+          title: formData.topicTitle,
+          subs: [newSubItem]
+        });
+      } else if (selTopic) {
+        // 4. Add subtopic to existing Topic
+        const tIdx = newModules[mIdx].topics.findIndex(t => t.id === selTopic);
+        if (tIdx !== -1) {
+          newModules[mIdx].topics[tIdx].subs.push(newSubItem);
+        }
+      }
+    }
+
+    await updateFirebaseConfig({ ...config, modules: newModules });
+    setFormData({ moduleTitle: "", topicTitle: "", subTitle: "", subDesc: "", subRef: "" });
   };
 
   const handleRemoveAction = async () => {
@@ -307,6 +374,91 @@ export default function DevOpsPage() {
         <button className="btn-revise" style={{ borderColor: 'var(--red)' }} onClick={() => setManageMode(manageMode === 'remove' ? null : 'remove')}>Remove Topic</button>
       </div>
 
+      {/* Add Management Panel */}
+      {manageMode === 'add' && (
+        <div className="container" style={{ background: 'var(--panel)', padding: '1.5rem', borderRadius: '8px', marginBottom: '2rem', border: '1px solid var(--border)' }}>
+          <h4 style={{ color: 'var(--text)', marginBottom: '1.25rem' }}>Add New Resource</h4>
+          <form onSubmit={handleAddAction} style={{ display: "flex", flexDirection: "column", gap: "1rem" }}>
+            
+            {/* 1. Select Module */}
+            <select required value={selMod} onChange={(e) => { setSelMod(e.target.value); setSelTopic(e.target.value === "NEW" ? "NEW" : ""); }} className="mono" style={{ background: '#0B0F14', color: 'white', padding: '10px', border: '1px solid var(--border)' }}>
+              <option value="">Step 1: Select Module...</option>
+              <option value="NEW">+ Add Brand New Module</option>
+              {config.modules.map(m => <option key={m.id} value={m.id}>{m.title}</option>)}
+            </select>
+
+            {/* 1a. Module Title (Only if NEW module) */}
+            {selMod === "NEW" && (
+              <input 
+                required 
+                type="text" 
+                placeholder="New Module Title (e.g. MOD 12: Advanced Networking)"
+                value={formData.moduleTitle}
+                onChange={(e) => setFormData({...formData, moduleTitle: e.target.value})}
+                style={{ background: '#0B0F14', color: 'white', padding: '10px', border: '1px solid var(--border)', borderRadius: '4px' }}
+              />
+            )}
+
+            {/* 2. Select Topic (Only if Module exists) */}
+            {selMod && selMod !== "NEW" && (
+              <select required value={selTopic} onChange={(e) => setSelTopic(e.target.value)} className="mono" style={{ background: '#0B0F14', color: 'white', padding: '10px', border: '1px solid var(--border)' }}>
+                <option value="">Step 2: Choose Topic...</option>
+                <option value="NEW">+ Add Brand New Topic</option>
+                {currentModule?.topics.map(t => <option key={t.id} value={t.id}>{t.title}</option>)}
+              </select>
+            )}
+
+            {/* 3. Topic Title (If NEW topic or NEW module) */}
+            {selTopic === "NEW" && (
+              <input 
+                required 
+                type="text" 
+                placeholder="Topic Title (e.g. Docker Basics)"
+                value={formData.topicTitle}
+                onChange={(e) => setFormData({...formData, topicTitle: e.target.value})}
+                style={{ background: '#0B0F14', color: 'white', padding: '10px', border: '1px solid var(--border)', borderRadius: '4px' }}
+              />
+            )}
+
+            {/* 4. Subtopic details */}
+            {selTopic && (
+              <div style={{ display: "flex", flexDirection: "column", gap: "1rem", padding: "1rem", background: "rgba(255,255,255,0.03)", borderRadius: "4px", border: "1px dashed var(--border)" }}>
+                <label style={{ fontSize: "11px", color: "var(--accent)", textTransform: "uppercase" }}>Subtopic Details</label>
+                <input 
+                  required 
+                  type="text" 
+                  placeholder="Subtopic Title (e.g. Container Lifecycle)"
+                  value={formData.subTitle}
+                  onChange={(e) => setFormData({...formData, subTitle: e.target.value})}
+                  style={{ background: '#0B0F14', color: 'white', padding: '10px', border: '1px solid var(--border)', borderRadius: '4px' }}
+                />
+                <textarea 
+                  required 
+                  placeholder="Subtopic Description..."
+                  value={formData.subDesc}
+                  onChange={(e) => setFormData({...formData, subDesc: e.target.value})}
+                  style={{ background: '#0B0F14', color: 'white', padding: '10px', border: '1px solid var(--border)', borderRadius: '4px', minHeight: '80px' }}
+                />
+                <input 
+                  type="url" 
+                  placeholder="Reference Link (Optional)"
+                  value={formData.subRef}
+                  onChange={(e) => setFormData({...formData, subRef: e.target.value})}
+                  style={{ background: '#0B0F14', color: 'white', padding: '10px', border: '1px solid var(--border)', borderRadius: '4px' }}
+                />
+              </div>
+            )}
+
+            {selTopic && (
+              <button type="submit" className="btn-revise" style={{ background: 'var(--accent)', color: 'black', fontWeight: 'bold', marginTop: '0.5rem' }}>
+                Save to {selMod === "NEW" ? "New Module" : selTopic === "NEW" ? "New Topic" : "Existing Topic"}
+              </button>
+            )}
+          </form>
+        </div>
+      )}
+
+      {/* Remove Management Panel */}
       {manageMode === 'remove' && (
         <div className="container" style={{ background: 'var(--panel)', padding: '1.5rem', borderRadius: '8px', marginBottom: '2rem', border: '1px solid var(--border)' }}>
           <h4 style={{ color: 'var(--text)', marginBottom: '1rem' }}>Cascading Remove</h4>
@@ -315,19 +467,27 @@ export default function DevOpsPage() {
               <option value="">Select Module...</option>
               {config.modules.map(m => <option key={m.id} value={m.id}>{m.title}</option>)}
             </select>
+
             {selMod && (
               <select value={selTopic} onChange={(e) => { setSelTopic(e.target.value); setSelSub(""); }} className="mono" style={{ background: '#0B0F14', color: 'white', padding: '8px' }}>
                 <option value="">Select Topic...</option>
                 {currentModule?.topics.map(t => <option key={t.id} value={t.id}>{t.title}</option>)}
               </select>
             )}
+
             {selTopic && (
               <select value={selSub} onChange={(e) => setSelSub(e.target.value)} className="mono" style={{ background: '#0B0F14', color: 'white', padding: '8px' }}>
                 <option value="">Select Subtopic...</option>
                 {currentTopic?.subs.map((s, idx) => <option key={idx} value={idx}>{s.t}</option>)}
               </select>
             )}
-            <button className="btn-revise" style={{ background: 'var(--red)', opacity: selMod ? 1 : 0.5 }} disabled={!selMod} onClick={() => setShowConfirm(true)}>
+
+            <button 
+              className="btn-revise" 
+              style={{ background: 'var(--red)', opacity: selMod ? 1 : 0.5 }} 
+              disabled={!selMod}
+              onClick={() => setShowConfirm(true)}
+            >
               Remove Selected {selSub ? "Subtopic" : selTopic ? "Topic" : "Module"}
             </button>
           </div>
