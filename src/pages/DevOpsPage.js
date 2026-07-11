@@ -4,7 +4,7 @@ import RevisionSiteHeader from "../components/revision/RevisionSiteHeader";
 import RevisionHeroSection from "../components/revision/RevisionHeroSection";
 import RevisionTopicCard from "../components/revision/RevisionTopicCard";
 import { db } from "../firebase";
-import { doc, setDoc, getDocs, collection } from "firebase/firestore";
+import { doc, setDoc, getDocs, collection, getDoc, arrayUnion } from "firebase/firestore";
 import devopsData from "../data/devops.json";
 import "../components/revision.css";
 
@@ -74,6 +74,7 @@ export default function DevOpsPage() {
   const [openTopics, setOpenTopics] = useState({});
   const [openSubtopics, setOpenSubtopics] = useState({});
   const [revisionMap, setRevisionMap] = useState({});
+  const [customLinks, setCustomLinks] = useState({});
   const [activeModule, setActiveModule] = useState(modules[0]?.id || "");
   const [banner, setBanner] = useState("");
 
@@ -81,6 +82,22 @@ export default function DevOpsPage() {
     () => computeHealthCounts(revisionMap, topicIds),
     [revisionMap, topicIds]
   );
+
+  useEffect(() => {
+    let active = true;
+    const fetchGlobalLinks = async () => {
+      try {
+        const snap = await getDoc(doc(db, "sdeprepLinks", config.revisionPrefix));
+        if (snap.exists() && active) {
+          setCustomLinks(snap.data());
+        }
+      } catch (err) {
+        console.error("Error loading links:", err);
+      }
+    };
+    fetchGlobalLinks();
+    return () => { active = false; };
+  }, [config.revisionPrefix]);
 
   useEffect(() => {
     if (!user?.uid) {
@@ -181,6 +198,37 @@ export default function DevOpsPage() {
     }
   };
 
+  const handleAddLink = async (topicId, url) => {
+    if (!user) {
+      setBanner("Please sign in to add reference links.");
+      return;
+    }
+    const newLink = {
+      url,
+      status: true,
+      date: todayStr(),
+      userid: user.uid,
+      useremail: user.email || "anonymous"
+    };
+
+    try {
+      await setDoc(
+        doc(db, "sdeprepLinks", config.revisionPrefix),
+        {
+          [topicId]: arrayUnion(newLink)
+        },
+        { merge: true }
+      );
+      setCustomLinks((prev) => ({
+        ...prev,
+        [topicId]: [...(prev[topicId] || []), newLink]
+      }));
+    } catch (err) {
+      console.error("Error saving link:", err);
+      setBanner("Failed to submit link.");
+    }
+  };
+
   return (
     <div className="revision-page">
       <RevisionSiteHeader
@@ -228,7 +276,9 @@ export default function DevOpsPage() {
                     revision={revisionMap[topic.id]}
                     onToggleTopic={toggleTopic}
                     onToggleSubtopic={toggleSubtopic}
-                    onRevise={handleRevise}
+                    onRevise={() => handleRevise(topic.id)}
+                    customLinks={customLinks[topic.id] || []}
+                    onAddLink={handleAddLink}
                   />
                 ))}
               </div>
